@@ -6,6 +6,7 @@ struct Ray
 {
     float3 direction;
     float3 origin;
+    float3 energy;
 };
 
 struct RayHit
@@ -38,6 +39,7 @@ Ray CreateRay(float3 origin, float3 direction)
     Ray ray;
     ray.origin = origin;
     ray.direction = direction;
+    ray.energy = 1.f;
     return ray;
 }
 
@@ -105,25 +107,35 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
 RayHit Trace(Ray ray)
 {
     RayHit bestHit = CreateRayHit();
-    IntersectGroundPlane(ray, bestHit);
-    IntersectSphere(ray, bestHit, float4(0, 2, 1, 1));
+    //IntersectGroundPlane(ray, bestHit);
+    IntersectSphere(ray, bestHit, float4(0, 1, 3, 0.5f));
     return bestHit;
 }
 
 float3 Shade(inout Ray ray, RayHit hit)
 {
-    float3 col;
+    float3 col = float3(0, 0, 0);
+    
     if (hit.distance < 1.#INF)
     {
-        col = hit.normal * 0.5f + 0.5f;
-    }
-    else
-    {
-        float2 sph = CartesianToSpherical(ray.direction);
-        col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb;
-    }
+        float3 specular = float3(0.6f, 0.6f, 0.6f);     //specular elements for R G and B channels
+        ray.origin = hit.position + hit.normal * 0.001f;
+        ray.direction = reflect(ray.direction, hit.normal);
+        ray.energy *= specular;
 
+        return float3(0.f, 0.f, 0.f);       //our objects have no albedo
+        //return hit.normal * 0.5f + 0.5f;
+    }
+    
+       //we didn't hit anything, return the skybox
+    
+    float2 sph = CartesianToSpherical(ray.direction);
+    col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb * ray.energy;
+    ray.energy = 0.f;
     return col;
+    
+
+    
 }
 
 
@@ -140,9 +152,21 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     float2 sUV = float2((id.xy + float2(0.5f, 0.5f)) / dim.xy) * 2.0f - 1.0f;
     Ray r = CreateCameraRay(sUV);
     float4 res;
+    float3 col = float3(0, 0, 0);
+
+    for (int a =0; a<8; a++)
+    {
+        RayHit rh = Trace(r);
+        float3 c = Shade(r, rh);
+        col += c;
+        //break;
+        
+        if (!any(r.energy))
+            break;
+    }
+    res = float4(col, 1.f);
     
-    RayHit rh = Trace(r);
-    res = float4(Shade(r, rh), 1.f);
+    
     
     Result[id.xy] = res;
     //Result[id.xy] = float4(r.direction * 0.5f + 0.5f, 1);
