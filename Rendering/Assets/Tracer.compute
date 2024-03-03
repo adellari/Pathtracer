@@ -1,16 +1,61 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
+#define PI 3.1415926535
+
+struct Ray
+{
+    float3 direction;
+    float3 origin;
+};
+
+struct RayHit
+{
+    float3 hit;
+    float3 normal;
+    float distance;
+};
 
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
 RWTexture2D<float4> Result;
+Texture2D<float4> Skybox;
+float4x4 CameraToWorld;
+float4x4 WorldToCamera;
+float4x4 CameraInverseProjection;
+
+
+Ray CreateRay(float3 origin, float3 direction)
+{
+    Ray ray;
+    ray.origin = origin;
+    ray.direction = direction;
+    return ray;
+}
+
+Ray CreateCameraRay(float2 uv)
+{
+    Ray ray;
+    //a ray from world space origin into view space 
+    float3 or = mul(float4(0, 0, 0, 1), WorldToCamera).xyz;
+    //a ray from view (clip space) to camera space
+    float3 dir = mul(float4(uv, 0, 1), CameraInverseProjection).xyz;
+    //convert direction from camera space to world space
+    dir = normalize(mul(float4(dir, 0), WorldToCamera).xyz);
+    ray = CreateRay(or, dir);
+    return ray;
+}
 
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
 {
     // TODO: insert actual code here!
-
-    Result[id.xy] = float4(id.x & id.y, (id.x & 15)/15.0, (id.y & 15)/15.0, 0.0);
+    float2 dim;
+    Result.GetDimensions(dim.x, dim.y);
+    //screen UV spanning [-1, 1]
+    //we first add 0.5, 0.5 to shift sample to the middle of the pixel
+    float2 sUV = float2((id.xy + float2(0.5f, 0.5f)) / dim.xy) * 2.0f - 1.0f;
+    Ray r = CreateCameraRay(sUV);
+    Result[id.xy] = float4(r.direction * 0.5f + 0.5f, 1);
 }

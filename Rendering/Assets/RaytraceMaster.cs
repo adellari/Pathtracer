@@ -43,6 +43,8 @@ public class RaytraceMaster : MonoBehaviour
     {
         tracer.SetTexture(0, "Result", target);
         tracer.SetMatrix("CameraToWorld", main.cameraToWorldMatrix);
+        tracer.SetMatrix("WorldToCamera", main.worldToCameraMatrix);
+        tracer.SetMatrix("CameraInverseProjection", main.projectionMatrix.inverse);
         tracer.Dispatch(0, groups.x, groups.y, 1);
     }
 
