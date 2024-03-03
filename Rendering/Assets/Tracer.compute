@@ -76,8 +76,29 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
     }
 }
 
+//take in a ray, and sphere position, with w component being the width
 void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
 {
+    float3 toOrigin = ray.origin - sphere.xyz; //from the sphere to the origin
+
+
+    //a ray can intersect with sphere at entrance AND exit (2 points)
+    float p1 = -dot(ray.direction, toOrigin);
+    float p2sqr = p1 * p1 - dot(toOrigin, toOrigin) + sphere.w * sphere.w;
+
+    if (p2sqr < 0)
+        return;
+
+    float p2 = sqrt(p2sqr);
+    // return the first collision either entrance (if it exists), or exit (if no entrance)
+    float t = p1 - p2 > 0? p1 - p2 : p1 + p2;
+
+    if(t> 0 && t < bestHit.distance)
+    {
+        bestHit.distance = t;
+        bestHit.position = ray.origin + (ray.direction * t);
+        bestHit.normal = normalize(bestHit.position - sphere.xyz);
+    }
     
 }
 
@@ -85,6 +106,7 @@ RayHit Trace(Ray ray)
 {
     RayHit bestHit = CreateRayHit();
     IntersectGroundPlane(ray, bestHit);
+    IntersectSphere(ray, bestHit, float4(0, 2, 1, 1));
     return bestHit;
 }
 
