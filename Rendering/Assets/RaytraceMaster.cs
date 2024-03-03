@@ -7,7 +7,7 @@ public class RaytraceMaster : MonoBehaviour
 {
     public RenderTexture target;
     public ComputeShader tracer;
-
+    public Texture Skybox;
     struct DispatchParams
     {
         public int x;
@@ -45,6 +45,7 @@ public class RaytraceMaster : MonoBehaviour
         tracer.SetMatrix("CameraToWorld", main.cameraToWorldMatrix);
         tracer.SetMatrix("WorldToCamera", main.worldToCameraMatrix);
         tracer.SetMatrix("CameraInverseProjection", main.projectionMatrix.inverse);
+        tracer.SetTexture(0, "Skybox", Skybox);
         tracer.Dispatch(0, groups.x, groups.y, 1);
     }
 

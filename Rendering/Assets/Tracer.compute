@@ -10,7 +10,7 @@ struct Ray
 
 struct RayHit
 {
-    float3 hit;
+    float3 position;
     float3 normal;
     float distance;
 };
@@ -20,10 +20,18 @@ struct RayHit
 // with cs.SetTexture
 RWTexture2D<float4> Result;
 Texture2D<float4> Skybox;
+SamplerState sampler_Skybox;    //must be similar in name to the texture so unity knows which texture to bind the sampler to
 float4x4 CameraToWorld;
 float4x4 WorldToCamera;
 float4x4 CameraInverseProjection;
 
+//returns theta, phi
+float2 CartesianToSpherical(float3 ray)
+{
+    float theta = acos(ray.y) / -PI;
+    float phi = atan2(ray.x , -ray.z) / -PI * 0.5f;
+    return float2(theta, phi);
+}
 
 Ray CreateRay(float3 origin, float3 direction)
 {
@@ -46,6 +54,58 @@ Ray CreateCameraRay(float2 uv)
     return ray;
 }
 
+RayHit CreateRayHit()
+{
+    RayHit hit;
+    hit.position = float3(0.f, 0.f, 0.f);
+    hit.distance = 1.#INF;
+    hit.normal = float3(0.f, 0.f, 0.f);
+    return hit;
+}
+
+void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
+{
+    //assume that the plane we're intersecting is right underneath us 
+    float t = -ray.origin.y / ray.direction.y;
+
+    if(t > 0 && t < bestHit.distance)
+    {
+        bestHit.distance = t;
+        bestHit.position = (t * ray.direction) + ray.origin;
+        bestHit.normal = float3(0.f, 1.f, 0.f);   //the ground plane has a normal pointing straight up
+    }
+}
+
+void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
+{
+    
+}
+
+RayHit Trace(Ray ray)
+{
+    RayHit bestHit = CreateRayHit();
+    IntersectGroundPlane(ray, bestHit);
+    return bestHit;
+}
+
+float3 Shade(inout Ray ray, RayHit hit)
+{
+    float3 col;
+    if (hit.distance < 1.#INF)
+    {
+        col = hit.normal * 0.5f + 0.5f;
+    }
+    else
+    {
+        float2 sph = CartesianToSpherical(ray.direction);
+        col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb;
+    }
+
+    return col;
+}
+
+
+
 
 [numthreads(8,8,1)]
 void CSMain (uint3 id : SV_DispatchThreadID)
@@ -57,5 +117,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     //we first add 0.5, 0.5 to shift sample to the middle of the pixel
     float2 sUV = float2((id.xy + float2(0.5f, 0.5f)) / dim.xy) * 2.0f - 1.0f;
     Ray r = CreateCameraRay(sUV);
-    Result[id.xy] = float4(r.direction * 0.5f + 0.5f, 1);
+    float4 res;
+    
+    RayHit rh = Trace(r);
+    res = float4(Shade(r, rh), 1.f);
+    
+    Result[id.xy] = res;
+    //Result[id.xy] = float4(r.direction * 0.5f + 0.5f, 1);
 }
