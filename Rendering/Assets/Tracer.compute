@@ -16,6 +16,13 @@ struct RayHit
     float distance;
 };
 
+struct Sphere
+{
+    float4 position;
+    float3 specular;
+    float3 albedo;
+};
+
 
 // Create a RenderTexture with enableRandomWrite flag and set it
 // with cs.SetTexture
@@ -25,6 +32,8 @@ SamplerState sampler_Skybox;    //must be similar in name to the texture so unit
 float4x4 CameraToWorld;
 float4x4 WorldToCamera;
 float4x4 CameraInverseProjection;
+uint SphereCount;
+StructuredBuffer<Sphere> Spheres;
 
 //returns theta, phi
 float2 CartesianToSpherical(float3 ray)
@@ -104,10 +113,18 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
     
 }
 
-RayHit Trace(Ray ray)
+RayHit Trace(Ray ray, uint count)
 {
     RayHit bestHit = CreateRayHit();
+    
+    
     IntersectGroundPlane(ray, bestHit);
+    
+    for(int a =0; a< count; a++)
+    {
+        IntersectSphere(ray, bestHit, Spheres[a].position);
+    }
+    
     IntersectSphere(ray, bestHit, float4(0, 0.5, 2.5, 0.5f));
     return bestHit;
 }
@@ -146,6 +163,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
 {
     // TODO: insert actual code here!
     float2 dim;
+    //uint2 SphereCount;
     Result.GetDimensions(dim.x, dim.y);
     //screen UV spanning [-1, 1]
     //we first add 0.5, 0.5 to shift sample to the middle of the pixel
@@ -153,10 +171,11 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     Ray r = CreateCameraRay(sUV);
     float4 res;
     float3 col = float3(0, 0, 0);
-
+    //Spheres.GetDimensions(SphereCount.x, SphereCount.y); //Metal does not querying buffer sizes
+    
     for (int a =0; a<8; a++)
     {
-        RayHit rh = Trace(r);
+        RayHit rh = Trace(r, SphereCount);
         float3 c = Shade(r, rh);
         //if(dot(rh.normal, float3(0, 1, 0)) == 1)
             //col += rh.normal * r.energy;
