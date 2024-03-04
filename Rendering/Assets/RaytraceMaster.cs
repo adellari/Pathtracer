@@ -102,6 +102,8 @@ public class RaytraceMaster : MonoBehaviour
     {
         if (target != null)
             target.Release();
-        
+
+        if (Spheres != null)
+            Spheres.Dispose();
     }
 }
