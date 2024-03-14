@@ -13,6 +13,8 @@ struct RayHit
 {
     float3 position;
     float3 normal;
+    float3 albedo;
+    float3 specular;
     float distance;
 };
 
@@ -57,7 +59,7 @@ Ray CreateCameraRay(float2 uv)
 {
     Ray ray;
     //a ray from world space origin into view space 
-    float3 or = mul(float4(0, 1, 0, 1), WorldToCamera).xyz;
+    float3 or = mul(float4(0, 3.5, -1, 1), WorldToCamera).xyz;
     //a ray from view (clip space) to camera space
     float3 dir = mul(float4(uv, 0, 1), CameraInverseProjection).xyz;
     //convert direction from camera space to world space
@@ -72,6 +74,8 @@ RayHit CreateRayHit()
     hit.position = float3(0.f, 0.f, 0.f);
     hit.distance = 1.#INF;
     hit.normal = float3(0.f, 0.f, 0.f);
+    hit.albedo = float3(0.f, 0.f, 0.f);
+    hit.specular = float3(0.f, 0.f, 0.f);
     return hit;
 }
 
@@ -90,18 +94,20 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
         bestHit.distance = t;
         bestHit.position = (t * ray.direction) + ray.origin;
         bestHit.normal = float3(0.f, 1.f, 0.f);   //the ground plane has a normal pointing straight up
+        bestHit.albedo = float3(0.f, 0.f, 0.f);
+        bestHit.specular = float3(1, 1, 1);
     }
 }
 
 //take in a ray, and sphere position, with w component being the width
-void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
+void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
 {
-    float3 toOrigin = ray.origin - sphere.xyz; //from the sphere to the origin
+    float3 toOrigin = ray.origin - sphere.position.xyz; //from the sphere to the origin
 
 
     //a ray can intersect with sphere at entrance AND exit (2 points)
     float p1 = -dot(ray.direction, toOrigin);
-    float p2sqr = p1 * p1 - dot(toOrigin, toOrigin) + sphere.w * sphere.w;
+    float p2sqr = p1 * p1 - dot(toOrigin, toOrigin) + sphere.position.w * sphere.position.w;
 
     if (p2sqr < 0)
         return;
@@ -114,7 +120,9 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, float4 sphere)
     {
         bestHit.distance = t;
         bestHit.position = ray.origin + (ray.direction * t);
-        bestHit.normal = normalize(bestHit.position - sphere.xyz);
+        bestHit.normal = normalize(bestHit.position - sphere.position.xyz);
+        bestHit.albedo += sphere.albedo;
+        bestHit.specular = sphere.specular;
     }
     
 }
@@ -128,10 +136,10 @@ RayHit Trace(Ray ray, uint count)
     
     for(int a =0; a< count; a++)
     {
-        IntersectSphere(ray, bestHit, Spheres[a].position);
+        IntersectSphere(ray, bestHit, Spheres[a]);
     }
     
-    IntersectSphere(ray, bestHit, float4(0, 0.5, 2.5, 0.5f));
+ //   IntersectSphere(ray, bestHit, float4(0, 0.5, 2.5, 0.5f));
     return bestHit;
 }
 
@@ -150,6 +158,9 @@ float3 Shade(inout Ray ray, RayHit hit)
     {
         float3 specular = float3(0.04f, 0.04f, 0.04f);     //specular elements for R G and B channels
         float3 lightCol = float3(0.8f, 0.8f, 0.8f);
+
+        specular = hit.specular;
+        lightCol = hit.albedo;
         
         ray.origin = hit.position + hit.normal * 0.001f;
         ray.direction = reflect(ray.direction, hit.normal);

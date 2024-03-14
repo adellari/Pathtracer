@@ -63,13 +63,14 @@ public class RaytraceMaster : MonoBehaviour
             float radius = Random.Range(0.1f, 1f);
 
             var xz = Random.insideUnitCircle * 5f; //space them out because they have radius
-            var spec = Random.insideUnitSphere;
-            var alb = Random.insideUnitSphere;
+            //var spec = Random.insideUnitSphere;
+            var alb = Random.ColorHSV();
+            bool metallic = Random.value < 0.5f;
 
+            
             s.point = new Vector4(xz.x, radius, xz.y, radius);
-            s.specular = spec;
-            s.albedo = alb;
-
+            s.specular = metallic ? new Vector3(alb.r, alb.g, alb.b) : Vector3.one * 0.04f;
+            s.albedo = metallic? Vector3.zero : new Vector3(alb.r, alb.g, alb.b);;
             spheres[a] = s;
         }
 
