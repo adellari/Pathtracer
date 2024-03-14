@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Experimental.GlobalIllumination;
 using Random = UnityEngine.Random;
 
 public class RaytraceMaster : MonoBehaviour
@@ -10,6 +11,7 @@ public class RaytraceMaster : MonoBehaviour
     public RenderTexture target;
     public ComputeShader tracer;
     public Texture Skybox;
+    public Transform mainLight;
     
     [Range(1, 20)]
     public int SphereCount = 5;
@@ -29,12 +31,13 @@ public class RaytraceMaster : MonoBehaviour
     
     private DispatchParams groups;
     private Camera main;
-
+    private Light dirLight;
     private ComputeBuffer Spheres;
     
     void Start()
     {
         main = Camera.main;
+        dirLight = mainLight.GetComponent<Light>();
         PrimeTarget();
         CreateSpheres();
     }
@@ -83,6 +86,7 @@ public class RaytraceMaster : MonoBehaviour
         tracer.SetBuffer(0, "Spheres", Spheres);
         tracer.SetTexture(0, "Skybox", Skybox);
         tracer.SetInt("SphereCount", SphereCount);
+        tracer.SetVector("light", new Vector4(mainLight.forward.x, mainLight.forward.y, mainLight.forward.z, dirLight.intensity));
         tracer.Dispatch(0, groups.x, groups.y, 1);
     }
 

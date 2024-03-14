@@ -33,6 +33,7 @@ float4x4 CameraToWorld;
 float4x4 WorldToCamera;
 float4x4 CameraInverseProjection;
 uint SphereCount;
+float4 light;
 StructuredBuffer<Sphere> Spheres;
 
 //returns theta, phi
@@ -72,6 +73,11 @@ RayHit CreateRayHit()
     hit.distance = 1.#INF;
     hit.normal = float3(0.f, 0.f, 0.f);
     return hit;
+}
+
+float2 rand()
+{
+    return float2(0, 0);
 }
 
 void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
@@ -132,14 +138,27 @@ RayHit Trace(Ray ray, uint count)
 float3 Shade(inout Ray ray, RayHit hit)
 {
     float3 col = float3(0, 0, 0);
+
+    bool shadow = false;
+    Ray shadowRay = CreateRay(hit.position + hit.normal * 0.001f, -light.xyz);
+    RayHit shadowHit = Trace(shadowRay, 6);
+
+    if (shadowHit.distance != 1.#INF)
+        return float3(0.f, 0.f, 0.f);
     
     if (hit.distance < 1.#INF)
     {
-        float3 specular = float3(0.6f, 0.6f, 0.6f);     //specular elements for R G and B channels
+        float3 specular = float3(0.04f, 0.04f, 0.04f);     //specular elements for R G and B channels
+        float3 lightCol = float3(0.8f, 0.8f, 0.8f);
+        
         ray.origin = hit.position + hit.normal * 0.001f;
         ray.direction = reflect(ray.direction, hit.normal);
         ray.energy *= specular;
 
+        
+        
+        return saturate(dot(hit.normal, light.xyz) * -1) * light.w * lightCol;
+        
         return float3(0.f, 0.f, 0.f) * ray.energy;       //our objects have no albedo
         //return hit.normal * 0.5f + 0.5f;
     }
