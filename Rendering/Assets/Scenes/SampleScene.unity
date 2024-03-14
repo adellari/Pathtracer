@@ -304,7 +304,7 @@ Transform:
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 1, z: -10}
+  m_LocalPosition: {x: 0, y: 3, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -325,6 +325,8 @@ MonoBehaviour:
   target: {fileID: 0}
   tracer: {fileID: 7200000, guid: 3d82d8f0eabca48cda358344cac1a8fc, type: 3}
   Skybox: {fileID: 2800000, guid: 6cbdc25e473d84c2a9deb545aa3d96c7, type: 3}
+  mainLight: {fileID: 705507995}
+  SphereCount: 5
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
