@@ -31,12 +31,18 @@ struct Sphere
 RWTexture2D<float4> Result;
 Texture2D<float4> Skybox;
 SamplerState sampler_Skybox;    //must be similar in name to the texture so unity knows which texture to bind the sampler to
+
 float4x4 CameraToWorld;
 float4x4 WorldToCamera;
 float4x4 CameraInverseProjection;
-uint SphereCount;
-float4 light;
+float4 CameraPosition;
 StructuredBuffer<Sphere> Spheres;
+uint SphereCount;
+
+float4 light;
+float4 _Pixel;  //current pixel xy, zw is the offset
+float _Seed;
+
 
 //returns theta, phi
 float2 CartesianToSpherical(float3 ray)
@@ -59,7 +65,7 @@ Ray CreateCameraRay(float2 uv)
 {
     Ray ray;
     //a ray from world space origin into view space 
-    float3 or = mul(float4(0, 3.5, -1, 1), WorldToCamera).xyz;
+    float3 or = mul(float4(CameraPosition.xyz, 1), WorldToCamera).xyz;
     //a ray from view (clip space) to camera space
     float3 dir = mul(float4(uv, 0, 1), CameraInverseProjection).xyz;
     //convert direction from camera space to world space
@@ -79,9 +85,16 @@ RayHit CreateRayHit()
     return hit;
 }
 
-float2 rand()
+float rand()
 {
-    return float2(0, 0);
+    float result = frac(sin(_Seed / 100.f * dot(_Pixel.xy, float2(12.9898f, 78.233f))) * 43758.5453f);
+    _Seed += 1.0f;
+    return result;
+}
+
+float3 SampleHemisphere(float3 normal)
+{
+    
 }
 
 void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
@@ -197,7 +210,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     Result.GetDimensions(dim.x, dim.y);
     //screen UV spanning [-1, 1]
     //we first add 0.5, 0.5 to shift sample to the middle of the pixel
-    float2 sUV = float2((id.xy + float2(0.5f, 0.5f)) / dim.xy) * 2.0f - 1.0f;
+    float2 sUV = float2((id.xy + float2(_Pixel.z, _Pixel.w)) / dim.xy) * 2.0f - 1.0f;
     Ray r = CreateCameraRay(sUV);
     float4 res;
     float3 col = float3(0, 0, 0);
