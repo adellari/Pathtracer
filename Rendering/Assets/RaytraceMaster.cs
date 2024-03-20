@@ -9,6 +9,7 @@ using Random = UnityEngine.Random;
 public class RaytraceMaster : MonoBehaviour
 {
     public RenderTexture target;
+    public RenderTexture converged;
     public ComputeShader tracer;
     public Texture Skybox;
     public Transform mainLight;
@@ -46,6 +47,7 @@ public class RaytraceMaster : MonoBehaviour
     void PrimeTarget()
     {
         target = new RenderTexture(main.pixelWidth, main.pixelHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
+        converged = new RenderTexture(main.pixelWidth, main.pixelHeight, 0, RenderTextureFormat.DefaultHDR);
         target.enableRandomWrite = true;
         target.Create();
 
@@ -68,7 +70,7 @@ public class RaytraceMaster : MonoBehaviour
             var xz = Random.insideUnitCircle * 5f; //space them out because they have radius
             //var spec = Random.insideUnitSphere;
             var alb = Random.ColorHSV();
-            bool metallic = Random.value < 0.5f;
+            bool metallic = Random.value < 0.0f;
 
             
             s.point = new Vector4(xz.x, radius, xz.y, radius);
@@ -93,6 +95,7 @@ public class RaytraceMaster : MonoBehaviour
         tracer.SetVector("CameraPosition", transform.position);
         tracer.SetVector("light", new Vector4(mainLight.forward.x, mainLight.forward.y, mainLight.forward.z, dirLight.intensity));
         tracer.SetVector("_Pixel", new Vector4(0, 0, Random.value, Random.value));
+        tracer.SetFloat("_Seed", Random.value);
         tracer.Dispatch(0, groups.x, groups.y, 1);
     }
 
@@ -102,17 +105,19 @@ public class RaytraceMaster : MonoBehaviour
         if (_addMaterial == null)
             _addMaterial = new Material(Shader.Find("Hidden/TSAA"));
         _addMaterial.SetFloat("_Sample", _currentSample);
-        Graphics.Blit(target, destination, _addMaterial);
+        Graphics.Blit(target, converged, _addMaterial);
+        Graphics.Blit(converged, destination);
         _currentSample++;
     }
 
     // Update is called once per frame
     void Update()
     {
-        if (transform.hasChanged)
+        if (transform.hasChanged || dirLight.transform.hasChanged)
         {
             _currentSample = 0;
             transform.hasChanged = false;
+            dirLight.transform.hasChanged = false;
         }
     }
 
@@ -123,5 +128,8 @@ public class RaytraceMaster : MonoBehaviour
 
         if (Spheres != null)
             Spheres.Dispose();
+
+        if (converged != null)
+            converged.Release();
     }
 }

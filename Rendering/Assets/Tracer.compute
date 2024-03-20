@@ -92,8 +92,31 @@ float rand()
     return result;
 }
 
+float sdot(float3 v1, float3 v2, float f = 1.)
+{
+    return saturate(dot(v1, v2) * f);
+}
+
+float3x3 GetTangentSpace(float3 normal)
+{
+    float3 helper = float3(1, 0, 0); 
+    if (dot(normal, helper) > 0.99f)    //use x aligned vector as our helper, but fallback to y aligned if our normal is too close to x axis
+        helper = float3(0, 1, 0);
+
+    float3 tangent = normalize(cross(normal, helper));
+    float3 binormal = normalize(cross(normal, tangent));
+
+    return float3x3(tangent, binormal, normal);
+}
+
 float3 SampleHemisphere(float3 normal)
 {
+    float cosTheta = rand();
+    float sinTheta = sqrt(max(0.0f, 1 - cosTheta * cosTheta));
+    float phi = 2 * PI * rand();    //pick a random phi angle on the x-z plane
+    float3 cartesianSpace = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
+
+    return mul(GetTangentSpace(normal), normal);
     
 }
 
@@ -176,6 +199,10 @@ float3 Shade(inout Ray ray, RayHit hit)
         lightCol = hit.albedo;
         
         ray.origin = hit.position + hit.normal * 0.001f;
+        ray.direction = SampleHemisphere(hit.normal);
+        ray.energy = 2 * hit.albedo * sdot(ray.direction, hit.normal);
+        return 0.f;
+        
         ray.direction = reflect(ray.direction, hit.normal);
         ray.energy *= specular;
 
@@ -214,6 +241,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     Ray r = CreateCameraRay(sUV);
     float4 res;
     float3 col = float3(0, 0, 0);
+    _Pixel.xy = id.xy;
     //Spheres.GetDimensions(SphereCount.x, SphereCount.y); //Metal does not querying buffer sizes
     
     for (int a =0; a<8; a++)
