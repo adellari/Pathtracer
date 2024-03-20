@@ -100,8 +100,8 @@ float sdot(float3 v1, float3 v2, float f = 1.)
 float3x3 GetTangentSpace(float3 normal)
 {
     float3 helper = float3(1, 0, 0); 
-    if (dot(normal, helper) > 0.99f)    //use x aligned vector as our helper, but fallback to y aligned if our normal is too close to x axis
-        helper = float3(0, 1, 0);
+    if (abs(normal.x) > 0.99f)    //use x aligned vector as our helper, but fallback to y aligned if our normal is too close to x axis
+        helper = float3(0, 0, 1);
 
     float3 tangent = normalize(cross(normal, helper));
     float3 binormal = normalize(cross(normal, tangent));
@@ -109,14 +109,15 @@ float3x3 GetTangentSpace(float3 normal)
     return float3x3(tangent, binormal, normal);
 }
 
+
 float3 SampleHemisphere(float3 normal)
 {
     float cosTheta = rand();
-    float sinTheta = sqrt(max(0.0f, 1 - cosTheta * cosTheta));
+    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
     float phi = 2 * PI * rand();    //pick a random phi angle on the x-z plane
     float3 cartesianSpace = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
 
-    return mul(GetTangentSpace(normal), normal);
+    return mul(cartesianSpace, GetTangentSpace(normal));
     
 }
 
@@ -200,7 +201,7 @@ float3 Shade(inout Ray ray, RayHit hit)
         
         ray.origin = hit.position + hit.normal * 0.001f;
         ray.direction = SampleHemisphere(hit.normal);
-        ray.energy = 2 * hit.albedo * sdot(ray.direction, hit.normal);
+        ray.energy *= 2 * hit.albedo * sdot(ray.direction, hit.normal);
         return 0.f;
         
         ray.direction = reflect(ray.direction, hit.normal);
