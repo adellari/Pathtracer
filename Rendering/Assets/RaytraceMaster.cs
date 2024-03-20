@@ -70,7 +70,7 @@ public class RaytraceMaster : MonoBehaviour
             var xz = Random.insideUnitCircle * 5f; //space them out because they have radius
             //var spec = Random.insideUnitSphere;
             var alb = Random.ColorHSV();
-            bool metallic = Random.value < 0.0f;
+            bool metallic = Random.value < 0.5f;
 
             
             s.point = new Vector4(xz.x, radius, xz.y, radius);

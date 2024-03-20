@@ -97,6 +97,11 @@ float sdot(float3 v1, float3 v2, float f = 1.)
     return saturate(dot(v1, v2) * f);
 }
 
+float energy(float3 color)
+{
+    return dot(color, 1.f / 3.f);
+}
+
 float3x3 GetTangentSpace(float3 normal)
 {
     float3 helper = float3(1, 0, 0); 
@@ -198,15 +203,25 @@ float3 Shade(inout Ray ray, RayHit hit)
 
         specular = hit.specular;
         lightCol = hit.albedo;
-        
+
         ray.origin = hit.position + hit.normal * 0.001f;
         ray.direction = SampleHemisphere(hit.normal);
-        ray.energy *= 2 * hit.albedo * sdot(ray.direction, hit.normal);
-        return 0.f;
+        
+        //Lambert Model
+        //ray.energy *= 2 * hit.albedo * sdot(ray.direction, hit.normal);
+        //return 0.f;
+
+        //Phong Model
+        float3 reflected = reflect(ray.direction, hit.normal);
+        float3 diffuse = 2 * min(1.f - hit.specular, hit.albedo);
+        float alpha = 15.f;
+        
+        specular = hit.specular * (alpha + 2) * pow(sdot(reflected, ray.direction), alpha);
+        ray.energy *= (diffuse + specular) * sdot(hit.normal, ray.direction);
         
         ray.direction = reflect(ray.direction, hit.normal);
         ray.energy *= specular;
-
+        return 0.f;
         
         
         return saturate(dot(hit.normal, light.xyz) * -1) * light.w * lightCol;
