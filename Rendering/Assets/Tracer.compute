@@ -15,6 +15,7 @@ struct RayHit
     float3 normal;
     float3 albedo;
     float3 specular;
+    float3 emission;
     float distance;
 };
 
@@ -23,6 +24,7 @@ struct Sphere
     float4 position;
     float3 specular;
     float3 albedo;
+    float3 emission;
 };
 
 
@@ -82,6 +84,7 @@ RayHit CreateRayHit()
     hit.normal = float3(0.f, 0.f, 0.f);
     hit.albedo = float3(0.f, 0.f, 0.f);
     hit.specular = float3(0.f, 0.f, 0.f);
+    hit.emission = float3(0.f, 0.f, 0.f);
     return hit;
 }
 
@@ -115,10 +118,10 @@ float3x3 GetTangentSpace(float3 normal)
 }
 
 
-float3 SampleHemisphere(float3 normal)
+float3 SampleHemisphere(float3 normal, float alpha)
 {
-    float cosTheta = rand();
-    float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
+    float cosTheta = pow(rand(), 1.f / (alpha + 1.f));
+    float sinTheta = sqrt(1.0f - cosTheta * cosTheta);
     float phi = 2 * PI * rand();    //pick a random phi angle on the x-z plane
     float3 cartesianSpace = float3(cos(phi) * sinTheta, sin(phi) * sinTheta, cosTheta);
 
@@ -136,8 +139,9 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
         bestHit.distance = t;
         bestHit.position = (t * ray.direction) + ray.origin;
         bestHit.normal = float3(0.f, 1.f, 0.f);   //the ground plane has a normal pointing straight up
-        bestHit.albedo = float3(0.f, 0.f, 0.f);
-        bestHit.specular = float3(1, 1, 1);
+        bestHit.albedo = 0.5f;
+        bestHit.specular = 0.03f;
+        bestHit.emission = 0.f;
     }
 }
 
@@ -163,8 +167,9 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
         bestHit.distance = t;
         bestHit.position = ray.origin + (ray.direction * t);
         bestHit.normal = normalize(bestHit.position - sphere.position.xyz);
-        bestHit.albedo += sphere.albedo;
+        bestHit.albedo = sphere.albedo;
         bestHit.specular = sphere.specular;
+        bestHit.emission = sphere.emission;
     }
     
 }
@@ -188,21 +193,9 @@ RayHit Trace(Ray ray, uint count)
 float3 Shade(inout Ray ray, RayHit hit)
 {
     float3 col = float3(0, 0, 0);
-
-    bool shadow = false;
-    Ray shadowRay = CreateRay(hit.position + hit.normal * 0.001f, -light.xyz);
-    RayHit shadowHit = Trace(shadowRay, 6);
-
-    if (shadowHit.distance != 1.#INF)
-        return float3(0.f, 0.f, 0.f);
     
     if (hit.distance < 1.#INF)
     {
-        float3 specular = float3(0.04f, 0.04f, 0.04f);     //specular elements for R G and B channels
-        float3 lightCol = float3(0.8f, 0.8f, 0.8f);
-
-        specular = hit.specular;
-        lightCol = hit.albedo;
 
         ray.origin = hit.position + hit.normal * 0.001f;
         
@@ -219,34 +212,39 @@ float3 Shade(inout Ray ray, RayHit hit)
         hit.albedo = min(1.f - hit.specular, hit.albedo);
         float specChance = energy(hit.specular);
         float diffChance = energy(hit.albedo);
-        float sum = specChance + diffChance;
-        specChance /= sum;
-        diffChance /= sum;
 
         float roulette = rand();
 
         if(roulette < specChance)
         {
-            ray.direction = reflected;
-            ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction);
+            float alpha = 20.f;
+            float f = (alpha + 2) / (alpha + 1);
+            ray.direction = SampleHemisphere(reflected, alpha);
+            ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);
+            //ray.direction = reflected;
+            //ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction);
+        }
+        else if(diffChance > 0 && roulette < specChance + diffChance)
+        {
+            ray.direction = SampleHemisphere(hit.normal, 1.f);
+            ray.energy *= (1.f / diffChance) * hit.albedo; //we remove our sdot function because sample hemisphere already takesinto account contribution
         }
         else
         {
-            ray.direction = SampleHemisphere(hit.normal);
-            ray.energy *= (1.f / diffChance) * 2 * hit.albedo * sdot(hit.normal, ray.direction);
+            ray.energy = 0.f;
         }
-        return 0.f;
+        return hit.emission;
         
-        return saturate(dot(hit.normal, light.xyz) * -1) * light.w * lightCol;
+        //return saturate(dot(hit.normal, light.xyz) * -1) * light.w * lightCol;
         
-        return float3(0.f, 0.f, 0.f) * ray.energy;       //our objects have no albedo
+        //return float3(0.f, 0.f, 0.f) * ray.energy;       //our objects have no albedo
         //return hit.normal * 0.5f + 0.5f;
     }
     
        //we didn't hit anything, return the skybox
     
     float2 sph = CartesianToSpherical(ray.direction);
-    col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb * ray.energy;
+    col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb;
     ray.energy = 0.f;
     return col;
     
@@ -279,7 +277,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
         float3 c = Shade(r, rh);
         //if(dot(rh.normal, float3(0, 1, 0)) == 1)
             //col += rh.normal * r.energy;
-        col += c;
+        col += c * r.energy;
         //break;
         
         if (!any(r.energy))
