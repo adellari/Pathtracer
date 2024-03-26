@@ -32,6 +32,7 @@ public class RaytraceMaster : MonoBehaviour
         public Vector3 specular;
         public Vector3 albedo;
         public Vector3 emission;
+        public float smoothness;
         public float RefractiveIndex;
     }
 
@@ -112,6 +113,7 @@ public class RaytraceMaster : MonoBehaviour
             s.point = new Vector4(xz.x, radius, xz.y, radius);
             s.specular = metallic ? new Vector3(alb.r, alb.g, alb.b) : Vector3.one * 0.04f;
             s.albedo = metallic? Vector3.zero : new Vector3(alb.r, alb.g, alb.b);;
+            s.smoothness = Random.value;
             spheres[a] = s;
             s.RefractiveIndex = 0;
         }

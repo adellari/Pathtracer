@@ -17,6 +17,7 @@ struct RayHit
     float3 albedo;
     float3 specular;
     float3 emission;
+    float smoothness;
     float distance;
     bool inside;
 };
@@ -27,6 +28,7 @@ struct Sphere
     float3 specular;
     float3 albedo;
     float3 emission;
+    float smoothness;
     float refractiveIndex;
 };
 
@@ -88,6 +90,7 @@ RayHit CreateRayHit()
     hit.albedo = float3(0.f, 0.f, 0.f);
     hit.specular = float3(0.f, 0.f, 0.f);
     hit.emission = float3(0.f, 0.f, 0.f);
+    hit.smoothness = 0.f;
     hit.inside = false;
     return hit;
 }
@@ -107,6 +110,12 @@ float sdot(float3 v1, float3 v2, float f = 1.)
 float energy(float3 color)
 {
     return dot(color, 1.f / 3.f);
+}
+
+//converting smoothness to a Phong Model alpha value
+float SmoothnessToAlpha(float s)
+{
+   return pow(1000.f, s*s); 
 }
 
 float3x3 GetTangentSpace(float3 normal)
@@ -146,6 +155,7 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
         bestHit.albedo = 0.5f;
         bestHit.specular = 0.8f;
         bestHit.emission = 0.f;
+        bestHit.smoothness = 0.98f;
     }
 }
 
@@ -222,6 +232,7 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
         bestHit.albedo = sphere.albedo;
         bestHit.specular = sphere.specular;
         bestHit.emission = sphere.emission;
+        bestHit.smoothness = sphere.smoothness;
     }
     
 }
@@ -254,6 +265,7 @@ RayHit Trace(Ray ray)
             bestHit.albedo = 0.1f;
             bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
             bestHit.emission = 0.f;
+            bestHit.smoothness = 0.9f;
         }
     }
     
@@ -289,7 +301,7 @@ float3 Shade(inout Ray ray, RayHit hit)
         //specular
         if(roulette < specChance)
         {
-            float alpha = 2000.f; //higher powers mean our pow function converges around the reflected ray in sample hemisphere
+            float alpha = SmoothnessToAlpha(hit.smoothness); //higher powers mean our pow function converges around the reflected ray in sample hemisphere
             float f = (alpha + 2) / (alpha + 1);
             ray.direction = SampleHemisphere(reflected, alpha); //we still use importance sampling but around our reflected ray and with tight constraint
             ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);   //we propegate importance sampling into the energy so more likely reflections are weighed more
