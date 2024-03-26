@@ -155,7 +155,7 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
         bestHit.albedo = 0.5f;
         bestHit.specular = 0.8f;
         bestHit.emission = 0.f;
-        bestHit.smoothness = 0.98f;
+        bestHit.smoothness = 3.f;
     }
 }
 
@@ -240,9 +240,10 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
 RayHit Trace(Ray ray)
 {
     RayHit bestHit = CreateRayHit();
-    float3 v0 = float3(-5, 0, -5);
-    float3 v1 = float3(5, 0, -5);
-    float3 v2 = float3(0, 5 * sqrt(2), -5);
+    float3 v0 = float3(-3, 0, -3);
+    float3 v1 = float3(3, 0, -3);
+    float3 v2 = float3(-3, 5, 0);
+    //float3 v2 = float3(0, 3 * sqrt(2), -3);
 
     float t, u, v;
 
@@ -255,7 +256,8 @@ RayHit Trace(Ray ray)
         IntersectSphere(ray, bestHit, Spheres[a]);
     }
 
-    if(IntersectTriangle(ray, v0, v1, v2, t, u, v))
+    //back wall
+    if(IntersectTriangle(ray, float3(-4.5, 5, -3), float3(3, 0, -3), float3(3, 5, -3), t, u, v))
     {
         if(t > 0 && t < bestHit.distance)
         {
@@ -265,7 +267,80 @@ RayHit Trace(Ray ray)
             bestHit.albedo = 0.1f;
             bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
             bestHit.emission = 0.f;
-            bestHit.smoothness = 0.9f;
+            bestHit.smoothness = 0.99f;
+        }
+    }
+
+    if(IntersectTriangle(ray, float3(-4.5, 0, -3), float3(3, 0, -3), float3(-4.5, 5, -3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 0.1f;
+            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.emission = 0.f;
+            bestHit.smoothness = 0.99f;
+        }
+    }
+
+    
+    //left wall
+    if(IntersectTriangle(ray, float3(3, 0, -3), float3(3, 0, 3), float3(3, 5, 3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 0.1f;
+            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.emission = 0.f;
+            bestHit.smoothness = 0.99f;
+        }
+    }
+
+    if(IntersectTriangle(ray, float3(3, 5, -3), float3(3, 0, -3), float3(3, 5, 3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 0.1f;
+            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.emission = 0.f;
+            bestHit.smoothness = 0.99f;
+        }
+    }
+
+    //right wall
+    if(IntersectTriangle(ray, float3(-4.5, 5, 3), float3(-4.5, 0, 3), float3(-4.5, 0, -3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 0.1f;
+            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.emission = 0.f;
+            bestHit.smoothness = 0.99f;
+        }
+    }
+
+    if(IntersectTriangle(ray, float3(-4.5, 5, 3), float3(-4.5, 0, -3), float3(-4.5, 5, -3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 0.1f;
+            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.emission = 0.f;
+            bestHit.smoothness = 0.99f;
         }
     }
     
