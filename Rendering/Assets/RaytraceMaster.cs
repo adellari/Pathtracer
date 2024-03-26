@@ -15,7 +15,9 @@ public class RaytraceMaster : MonoBehaviour
     public Transform mainLight;
     
     [Range(1, 20)]
-    public int SphereCount = 5;
+    public int SphereCount = 4;
+
+    public bool randomized = true;
     struct DispatchParams
     {
         public int x;
@@ -23,13 +25,17 @@ public class RaytraceMaster : MonoBehaviour
         public int z;
     }
 
-    struct Sphere
+    [System.Serializable]
+    public struct Sphere
     {
         public Vector4 point;
         public Vector3 specular;
         public Vector3 albedo;
         public Vector3 emission;
+        public float RefractiveIndex;
     }
+
+    [SerializeField] public Sphere[] _Spheres;
     
     private DispatchParams groups;
     private Camera main;
@@ -39,10 +45,17 @@ public class RaytraceMaster : MonoBehaviour
     private Material _addMaterial;
     void Start()
     {
+        FreeAllocations();
+        
         main = Camera.main;
         dirLight = mainLight.GetComponent<Light>();
         PrimeTarget();
-        CreateSpheres();
+        
+        if (randomized)
+            CreateSpheres();
+        else
+            CommandUpdateSpheres();
+        
     }
 
     void PrimeTarget()
@@ -51,7 +64,7 @@ public class RaytraceMaster : MonoBehaviour
         target.enableRandomWrite = true;
         target.Create();
         
-        converged = new RenderTexture(main.pixelWidth, main.pixelHeight, 0, RenderTextureFormat.DefaultHDR, RenderTextureReadWrite.Linear);
+        converged = new RenderTexture(main.pixelWidth, main.pixelHeight, 0, RenderTextureFormat.ARGBFloat, RenderTextureReadWrite.Linear);
         converged.enableRandomWrite = true;
         converged.Create();
 
@@ -59,8 +72,17 @@ public class RaytraceMaster : MonoBehaviour
         groups.x = Mathf.CeilToInt(main.pixelWidth / 8);
         groups.y = Mathf.CeilToInt(main.pixelHeight / 8);
         groups.z = 0;
+        _currentSample = 0;
 
-        
+    }
+
+    [ContextMenu("Update Spheres")]
+    public void CommandUpdateSpheres()
+    {
+        if(Spheres != null)
+            Spheres.Dispose();
+        Spheres = new ComputeBuffer(_Spheres.Length, Marshal.SizeOf(typeof(Sphere)));
+        Spheres.SetData(_Spheres);
     }
 
     void CreateSpheres()
@@ -91,6 +113,7 @@ public class RaytraceMaster : MonoBehaviour
             s.specular = metallic ? new Vector3(alb.r, alb.g, alb.b) : Vector3.one * 0.04f;
             s.albedo = metallic? Vector3.zero : new Vector3(alb.r, alb.g, alb.b);;
             spheres[a] = s;
+            s.RefractiveIndex = 0;
         }
 
         Spheres = new ComputeBuffer(SphereCount, Marshal.SizeOf(typeof(Sphere)));
@@ -135,7 +158,7 @@ public class RaytraceMaster : MonoBehaviour
         }
     }
 
-    private void OnApplicationQuit()
+    void FreeAllocations()
     {
         if (target != null)
             target.Release();
@@ -145,5 +168,10 @@ public class RaytraceMaster : MonoBehaviour
 
         if (converged != null)
             converged.Release();
+    }
+
+    private void OnApplicationQuit()
+    {
+        FreeAllocations();
     }
 }

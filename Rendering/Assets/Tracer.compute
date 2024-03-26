@@ -1,6 +1,7 @@
 // Each #kernel tells which function to compile; you can have many kernels
 #pragma kernel CSMain
 #define PI 3.1415926535
+static const float EPSILON = 1e-8;
 
 struct Ray
 {
@@ -17,6 +18,7 @@ struct RayHit
     float3 specular;
     float3 emission;
     float distance;
+    bool inside;
 };
 
 struct Sphere
@@ -25,6 +27,7 @@ struct Sphere
     float3 specular;
     float3 albedo;
     float3 emission;
+    float refractiveIndex;
 };
 
 
@@ -59,7 +62,7 @@ Ray CreateRay(float3 origin, float3 direction)
     Ray ray;
     ray.origin = origin;
     ray.direction = direction;
-    ray.energy = 1.f;
+    ray.energy = float3(1.f, 1.f, 1.f);
     return ray;
 }
 
@@ -85,6 +88,7 @@ RayHit CreateRayHit()
     hit.albedo = float3(0.f, 0.f, 0.f);
     hit.specular = float3(0.f, 0.f, 0.f);
     hit.emission = float3(0.f, 0.f, 0.f);
+    hit.inside = false;
     return hit;
 }
 
@@ -140,9 +144,53 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
         bestHit.position = (t * ray.direction) + ray.origin;
         bestHit.normal = float3(0.f, 1.f, 0.f);   //the ground plane has a normal pointing straight up
         bestHit.albedo = 0.5f;
-        bestHit.specular = 0.03f;
+        bestHit.specular = 0.8f;
         bestHit.emission = 0.f;
     }
+}
+
+void IntersectQuad(Ray ray, inout RayHit bestHit)
+{
+    
+}
+
+//The Tomas Akenine-Moller and Ben Trumbone 1997 fast triangle intersection algorithm
+//https://fileadmin.cs.lth.se/cs/Personal/Tomas_Akenine-Moller/pubs/raytri_tam.pdf
+//out params: t - how far along ray.direction we hit the triangle
+//          u, v, w are barycentrinc coords where w = 1 - u - v
+//barycentric equation for a point on a triangle is P = wA + uB + vC, where ABC are the vertices
+bool IntersectTriangle(Ray ray, float3 vert0, float3 vert1, float3 vert2, inout float t, inout float u, inout float v)
+{
+    //find vectors that share the same vertex (v0)
+    float3 edge1 = vert1 - vert0;
+    float3 edge2 = vert2 - vert0;
+
+    //calculate the determinant
+    float3 pvec = cross(ray.direction, edge2);
+    //when our deterimant is 0, the ray is parallel to the triangle,
+    //eg. lies in the same plane 
+    float det = dot(edge1, pvec);
+
+    //backface culling
+    if(det < EPSILON)
+        return false;
+    
+
+    float inv_det = 1.f / det;
+    //distance from ray origin to vertex 0
+    float3 tvec = ray.origin - vert0;
+    u = dot(tvec, pvec) * inv_det;
+    if (u< 0.f || u > 1.f)
+        return false;
+
+    float3 qvec = cross(tvec, edge1);
+
+    v = dot(ray.direction, qvec) * inv_det;
+    if(v < 0.f || u + v > 1.f)
+        return false;
+
+    t = dot(edge2, qvec) * inv_det;
+    return true;
 }
 
 //take in a ray, and sphere position, with w component being the width
@@ -160,12 +208,16 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
 
     float p2 = sqrt(p2sqr);
     // return the first collision either entrance (if it exists), or exit (if no entrance)
+    //when p1 is negative, we are within the sphere
     float t = p1 - p2 > 0? p1 - p2 : p1 + p2;
 
     if(t> 0 && t < bestHit.distance)
     {
+        float refractChance = rand() < 0.1f? -1.f : 1.f;
         bestHit.distance = t;
         bestHit.position = ray.origin + (ray.direction * t);
+        bestHit.inside = p1 < 0.f;
+        //bestHit.normal = normalize(bestHit.position - sphere.position.xyz) * bestHit.inside? -1.f * refractChance : 1.f;
         bestHit.normal = normalize(bestHit.position - sphere.position.xyz);
         bestHit.albedo = sphere.albedo;
         bestHit.specular = sphere.specular;
@@ -174,16 +226,35 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
     
 }
 
-RayHit Trace(Ray ray, uint count)
+RayHit Trace(Ray ray)
 {
     RayHit bestHit = CreateRayHit();
+    float3 v0 = float3(-5, 0, -5);
+    float3 v1 = float3(5, 0, -5);
+    float3 v2 = float3(0, 5 * sqrt(2), -5);
+
+    float t, u, v;
+
     
     
     IntersectGroundPlane(ray, bestHit);
     
-    for(int a =0; a< count; a++)
+    for(int a =0; a< SphereCount; a++)
     {
         IntersectSphere(ray, bestHit, Spheres[a]);
+    }
+
+    if(IntersectTriangle(ray, v0, v1, v2, t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 0.1f;
+            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.emission = 0.f;
+        }
     }
     
  //   IntersectSphere(ray, bestHit, float4(0, 0.5, 2.5, 0.5f));
@@ -215,18 +286,20 @@ float3 Shade(inout Ray ray, RayHit hit)
 
         float roulette = rand();
 
+        //specular
         if(roulette < specChance)
         {
-            float alpha = 20.f;
+            float alpha = 2000.f; //higher powers mean our pow function converges around the reflected ray in sample hemisphere
             float f = (alpha + 2) / (alpha + 1);
-            ray.direction = SampleHemisphere(reflected, alpha);
-            ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);
+            ray.direction = SampleHemisphere(reflected, alpha); //we still use importance sampling but around our reflected ray and with tight constraint
+            ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);   //we propegate importance sampling into the energy so more likely reflections are weighed more
             //ray.direction = reflected;
             //ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction);
         }
+        //diffuse
         else if(diffChance > 0 && roulette < specChance + diffChance)
         {
-            ray.direction = SampleHemisphere(hit.normal, 1.f);
+            ray.direction = SampleHemisphere(hit.normal, 1.f); //we use importance sampling 
             ray.energy *= (1.f / diffChance) * hit.albedo; //we remove our sdot function because sample hemisphere already takesinto account contribution
         }
         else
@@ -240,15 +313,17 @@ float3 Shade(inout Ray ray, RayHit hit)
         //return float3(0.f, 0.f, 0.f) * ray.energy;       //our objects have no albedo
         //return hit.normal * 0.5f + 0.5f;
     }
+    else
+    {
+        ray.energy = 0.f;
+        //we didn't hit anything, return the skybox
+        
+        float2 sph = CartesianToSpherical(ray.direction);
+        col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb;
+        
+        return col;
+    }
     
-       //we didn't hit anything, return the skybox
-    
-    float2 sph = CartesianToSpherical(ray.direction);
-    col = Skybox.SampleLevel(sampler_Skybox, float2(sph.y, sph.x), 0).rgb;
-    ray.energy = 0.f;
-    return col;
-    
-
     
 }
 
@@ -266,27 +341,22 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     //we first add 0.5, 0.5 to shift sample to the middle of the pixel
     float2 sUV = float2((id.xy + float2(_Pixel.z, _Pixel.w)) / dim.xy) * 2.0f - 1.0f;
     Ray r = CreateCameraRay(sUV);
-    float4 res;
-    float3 col = float3(0, 0, 0);
+    float3 col = float3(0.f, 0.f, 0.f);
     _Pixel.xy = id.xy;
     //Spheres.GetDimensions(SphereCount.x, SphereCount.y); //Metal does not querying buffer sizes
     
     for (int a =0; a<8; a++)
     {
-        RayHit rh = Trace(r, SphereCount);
-        float3 c = Shade(r, rh);
-        //if(dot(rh.normal, float3(0, 1, 0)) == 1)
-            //col += rh.normal * r.energy;
-        col += c * r.energy;
-        //break;
+        RayHit rh = Trace(r);
+        col += Shade(r, rh) * r.energy; //important that we get ray energy before we call shade
+        
         
         if (!any(r.energy))
             break;
     }
-    res = float4(col, 1.f);
     
     
     
-    Result[id.xy] = res;
+    Result[id.xy] = float4(col, 1);
     //Result[id.xy] = float4(r.direction * 0.5f + 0.5f, 1);
 }
