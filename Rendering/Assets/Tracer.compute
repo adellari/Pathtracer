@@ -17,8 +17,11 @@ struct RayHit
     float3 albedo;
     float3 specular;
     float3 emission;
+    float3 refractionColor;
+    float refractionChance;
     float smoothness;
     float distance;
+    float IOR;
     bool inside;
 };
 
@@ -28,8 +31,12 @@ struct Sphere
     float3 specular;
     float3 albedo;
     float3 emission;
+    float3 refractionColor;
     float smoothness;
     float refractiveIndex;
+    float refractionRoughness;
+    float refractionChance;
+    
 };
 
 
@@ -71,11 +78,11 @@ Ray CreateRay(float3 origin, float3 direction)
 Ray CreateCameraRay(float2 uv)
 {
     Ray ray;
-    //a ray from world space origin into view space 
+    // A ray from world space origin into camera space. 
     float3 or = mul(float4(CameraPosition.xyz, 1), WorldToCamera).xyz;
-    //a ray from view (clip space) to camera space
+    //a ray from the camera's clip space we need to convert to world space
     float3 dir = mul(float4(uv, 0, 1), CameraInverseProjection).xyz;
-    //convert direction from camera space to world space
+    //convert direction from world space into camera space
     dir = normalize(mul(float4(dir, 0), WorldToCamera).xyz);
     ray = CreateRay(or, dir);
     return ray;
@@ -90,8 +97,11 @@ RayHit CreateRayHit()
     hit.albedo = float3(0.f, 0.f, 0.f);
     hit.specular = float3(0.f, 0.f, 0.f);
     hit.emission = float3(0.f, 0.f, 0.f);
+    hit.refractionColor = float3(0.f, 0.f, 0.f);
     hit.smoothness = 0.f;
     hit.inside = false;
+    hit.refractionChance = 0.f;
+    hit.IOR = 1.f;
     return hit;
 }
 
@@ -116,6 +126,29 @@ float energy(float3 color)
 float SmoothnessToAlpha(float s)
 {
    return pow(1000.f, s*s); 
+}
+
+//n1 = index of refraction of medium, n2 = ior of material, f0 = minimum reflection of object, f90 = maximum reflection of object
+float FresnelReflectAmount(float n1, float n2, float3 normal, float3 incident, float f0, float f90)
+{
+    //Schlick approximation
+    float r0 = (n1-n2) / (n1+n2);
+    r0 *= r0;
+    float cosX = -dot(normal, incident);
+    if (n1 > n2)
+    {
+        float n = n1/n2;
+        float sinT2 = n*n*(1.0-cosX*cosX);
+        // Total internal reflection
+        if (sinT2 > 1.0)
+            return f90;
+        cosX = sqrt(1.0-sinT2);
+    }
+    float x = 1.0-cosX;
+    float ret = r0+(1.0-r0)*x*x*x*x*x;
+ 
+    // adjust reflect multiplier for object reflectivity
+    return lerp(f0, f90, ret);
 }
 
 float3x3 GetTangentSpace(float3 normal)
@@ -210,30 +243,43 @@ void IntersectSphere(Ray ray, inout RayHit bestHit, Sphere sphere)
 
 
     //a ray can intersect with sphere at entrance AND exit (2 points)
-    float p1 = -dot(ray.direction, toOrigin);
-    float p2sqr = p1 * p1 - dot(toOrigin, toOrigin) + sphere.position.w * sphere.position.w;
+    float p1 = dot(toOrigin, ray.direction);    //b
+    float c = dot(toOrigin, toOrigin) - sphere.position.w * sphere.position.w;
 
-    if (p2sqr < 0)
+    if(c > 0.f && p1 > 0.f)
+        return;
+        
+    float p2sqr = p1 * p1 - c;
+
+    if(p2sqr < 0.f)
         return;
 
-    float p2 = sqrt(p2sqr);
-    // return the first collision either entrance (if it exists), or exit (if no entrance)
-    //when p1 is negative, we are within the sphere
-    float t = p1 - p2 > 0? p1 - p2 : p1 + p2;
-
-    if(t> 0 && t < bestHit.distance)
+    float dist = -p1 - sqrt(p2sqr);
+    
+   bool inside = false;
+    
+    if (dist < 0.f)
     {
-        float refractChance = rand() < 0.1f? -1.f : 1.f;
-        bestHit.distance = t;
-        bestHit.position = ray.origin + (ray.direction * t);
-        bestHit.inside = p1 < 0.f;
-        //bestHit.normal = normalize(bestHit.position - sphere.position.xyz) * bestHit.inside? -1.f * refractChance : 1.f;
-        bestHit.normal = normalize(bestHit.position - sphere.position.xyz);
-        bestHit.albedo = sphere.albedo;
-        bestHit.specular = sphere.specular;
-        bestHit.emission = sphere.emission;
-        bestHit.smoothness = sphere.smoothness;
+        inside = true;
+        dist = -p1 + sqrt(p2sqr);
     }
+
+    if(dist < bestHit.distance && dist > 0.f)
+    {
+            bestHit.distance = dist;
+            bestHit.position = ray.origin + (ray.direction * dist);
+            bestHit.inside = inside;
+            bestHit.normal = normalize(bestHit.position - sphere.position.xyz) * (bestHit.inside ? -1.f : 1.f);
+            bestHit.albedo = sphere.albedo;
+            bestHit.specular = sphere.specular;
+            bestHit.emission = sphere.emission;
+            bestHit.smoothness = sphere.smoothness;
+            bestHit.refractionChance = sphere.refractionChance;
+            bestHit.refractionColor = sphere.refractionColor;
+            bestHit.IOR = sphere.refractiveIndex;
+    }
+    
+    
     
 }
 
@@ -294,10 +340,10 @@ RayHit Trace(Ray ray)
             bestHit.distance = t;
             bestHit.position = ray.origin + ray.direction * t;
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
-            bestHit.albedo = 0.1f;
-            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
-            bestHit.emission = 0.f;
-            bestHit.smoothness = 0.99f;
+            bestHit.albedo = 1.f;
+            bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
+            bestHit.emission = 2.f;
+            bestHit.smoothness = 0.01f;
         }
     }
 
@@ -308,10 +354,10 @@ RayHit Trace(Ray ray)
             bestHit.distance = t;
             bestHit.position = ray.origin + ray.direction * t;
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
-            bestHit.albedo = 0.1f;
-            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
-            bestHit.emission = 0.f;
-            bestHit.smoothness = 0.99f;
+            bestHit.albedo = 1.f;
+            bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
+            bestHit.emission = 2.f;
+            bestHit.smoothness = 0.01f;
         }
     }
 
@@ -323,8 +369,8 @@ RayHit Trace(Ray ray)
             bestHit.distance = t;
             bestHit.position = ray.origin + ray.direction * t;
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
-            bestHit.albedo = 0.1f;
-            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.albedo = 0.5f;
+            bestHit.specular = float3(0.6f, 0.01f, 0.3f);
             bestHit.emission = 0.f;
             bestHit.smoothness = 0.99f;
         }
@@ -337,12 +383,42 @@ RayHit Trace(Ray ray)
             bestHit.distance = t;
             bestHit.position = ray.origin + ray.direction * t;
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
-            bestHit.albedo = 0.1f;
-            bestHit.specular = 0.65f * float3(1.f, 0.4f, 0.2f);
+            bestHit.albedo = 0.5f;
+            bestHit.specular = float3(0.01f, 0.01f, 0.01f);
             bestHit.emission = 0.f;
             bestHit.smoothness = 0.99f;
         }
     }
+
+    //top wall
+    if(IntersectTriangle(ray, float3(-4.5, 5, -3), float3(3, 5, 3), float3(-4.5, 5, 3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 1.f;
+            bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
+            bestHit.emission = 2.f;
+            bestHit.smoothness = 0.01f;
+        }
+    }
+
+    if(IntersectTriangle(ray, float3(4.5, 5, -3), float3(3, 5, 3), float3(-4.5, 5, -3), t, u, v))
+    {
+        if(t > 0 && t < bestHit.distance)
+        {
+            bestHit.distance = t;
+            bestHit.position = ray.origin + ray.direction * t;
+            bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
+            bestHit.albedo = 1.f;
+            bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
+            bestHit.emission = 2.f;
+            bestHit.smoothness = 0.01f;
+        }
+    }
+    
     
  //   IntersectSphere(ray, bestHit, float4(0, 0.5, 2.5, 0.5f));
     return bestHit;
@@ -355,26 +431,36 @@ float3 Shade(inout Ray ray, RayHit hit)
     if (hit.distance < 1.#INF)
     {
 
-        ray.origin = hit.position + hit.normal * 0.001f;
         
         
+        if (hit.inside)
+            ray.energy *= exp(-hit.refractionColor * hit.distance);
         //Lambert Model
         //ray.energy *= 2 * hit.albedo * sdot(ray.direction, hit.normal);
         //return 0.f;
 
         //Phong Model
         float3 reflected = reflect(ray.direction, hit.normal);
+        float3 refracted = refract(ray.direction, hit.normal, hit.inside ? hit.IOR : 1.f / hit.IOR);
         //float3 diffuse = 2 * min(1.f - hit.specular, hit.albedo);
         //float alpha = 15.f;
         
         hit.albedo = min(1.f - hit.specular, hit.albedo);
         float specChance = energy(hit.specular);
         float diffChance = energy(hit.albedo);
+        float refractChance = hit.refractionChance;
+
+        if (specChance > 0.f)
+        {
+            specChance = FresnelReflectAmount(hit.inside? hit.IOR : 1.f, hit.inside? 1.f : hit.IOR, ray.direction, hit.normal, specChance, 1.f);
+            refractChance *= (1.f - specChance) / (1.f - energy(hit.specular));
+        }
+        
 
         float roulette = rand();
 
         //specular
-        if(roulette < specChance)
+        if(specChance > 0.f && roulette < specChance)
         {
             float alpha = SmoothnessToAlpha(hit.smoothness); //higher powers mean our pow function converges around the reflected ray in sample hemisphere
             float f = (alpha + 2) / (alpha + 1);
@@ -382,16 +468,31 @@ float3 Shade(inout Ray ray, RayHit hit)
             ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction, f);   //we propegate importance sampling into the energy so more likely reflections are weighed more
             //ray.direction = reflected;
             //ray.energy *= (1.f / specChance) * hit.specular * sdot(hit.normal, ray.direction);
+            ray.origin = hit.position + hit.normal * 0.001f;
+        }
+        else if (refractChance > 0.f && roulette < specChance + refractChance)
+        {
+            //float alpha = SmoothnessToAlpha(2); //higher powers mean our pow function converges around the reflected ray in sample hemisphere
+            //float f = (alpha + 2) / (alpha + 1);
+            //ray.direction = lerp(refracted, normalize(SampleHemisphere(-refracted, alpha)), hit.smoothness * hit.smoothness);
+
+            float3 refractionRayDir = refract(ray.direction, hit.normal, hit.inside ? hit.IOR : 1.0f / hit.IOR);
+            refractionRayDir = normalize(lerp(refractionRayDir, normalize(-hit.normal + SampleHemisphere(refractionRayDir, 1000)), 0.f));
+            ray.direction = refractionRayDir;
+            //ray.energy *= (1.f / refractChance) * hit.refractionColor * sdot(hit.normal, ray.direction, 2.f);
+            ray.origin = hit.position - hit.normal * 0.001f;
         }
         //diffuse
         else if(diffChance > 0 && roulette < specChance + diffChance)
         {
             ray.direction = SampleHemisphere(hit.normal, 1.f); //we use importance sampling 
             ray.energy *= (1.f / diffChance) * hit.albedo; //we remove our sdot function because sample hemisphere already takesinto account contribution
+            ray.origin = hit.position + hit.normal * 0.001f;
         }
         else
         {
             ray.energy = 0.f;
+            ray.origin = hit.position + hit.normal * 0.001f;
         }
         return hit.emission;
         

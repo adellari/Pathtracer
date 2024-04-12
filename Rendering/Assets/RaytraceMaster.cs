@@ -32,8 +32,11 @@ public class RaytraceMaster : MonoBehaviour
         public Vector3 specular;
         public Vector3 albedo;
         public Vector3 emission;
+        public Vector3 refractionColor;
         public float smoothness;
         public float RefractiveIndex;
+        public float refractionRoughness;
+        public float refractionChance;
     }
 
     [SerializeField] public Sphere[] _Spheres;

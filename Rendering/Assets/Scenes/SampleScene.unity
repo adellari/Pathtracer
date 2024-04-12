@@ -303,13 +303,13 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 963194225}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.0019344892, y: 0.9978976, z: -0.035719298, w: 0.054044235}
-  m_LocalPosition: {x: 0, y: 2.13, z: 11.21}
+  m_LocalRotation: {x: -0.06383551, y: 0.9341912, z: -0.2148165, w: -0.27760705}
+  m_LocalPosition: {x: 1.5, y: 0.2, z: 5.4}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+  m_LocalEulerAnglesHint: {x: 25.9, y: 213.1, z: 0}
 --- !u!114 &963194229
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -330,30 +330,42 @@ MonoBehaviour:
   SphereCount: 4
   randomized: 0
   _Spheres:
-  - point: {x: -1, y: 0.5, z: 2, w: 0.5}
-    specular: {x: 1, y: 1, z: 1}
-    albedo: {x: 0.4, y: 0.4, z: 0.6}
+  - point: {x: -1, y: 0.55, z: -1.4, w: 0.5}
+    specular: {x: 0.67, y: 0.67, z: 0.67}
+    albedo: {x: 0.1, y: 0.42, z: 0.93}
     emission: {x: 0, y: 0, z: 0}
-    smoothness: 0.2
-    RefractiveIndex: 0
-  - point: {x: -3, y: 0.5, z: 0, w: 0.5}
+    refractionColor: {x: 0.91, y: 0.9, z: 0.8}
+    smoothness: 1
+    RefractiveIndex: 1.1
+    refractionRoughness: 0.9
+    refractionChance: 0.9
+  - point: {x: -30, y: 0.55, z: 0, w: 0.5}
     specular: {x: 1, y: 1, z: 1}
     albedo: {x: 0.4, y: 0.4, z: 0}
     emission: {x: 0, y: 0, z: 0}
+    refractionColor: {x: 0, y: 0, z: 0}
     smoothness: 0.5
-    RefractiveIndex: 0
-  - point: {x: -1, y: 1, z: 0, w: 0.5}
+    RefractiveIndex: 0.4
+    refractionRoughness: 0.003
+    refractionChance: 0
+  - point: {x: -10, y: 1, z: 0, w: 0.5}
     specular: {x: 0.2, y: 0.2, z: 1}
     albedo: {x: 0.1, y: 0.1, z: 0}
-    emission: {x: 1, y: 0, z: 1}
+    emission: {x: 1, y: 0, z: 10}
+    refractionColor: {x: 0, y: 0, z: 0}
     smoothness: 0
     RefractiveIndex: 0
-  - point: {x: 1, y: 0.5, z: 0, w: 0.5}
+    refractionRoughness: 0
+    refractionChance: 0
+  - point: {x: 10, y: 0.53, z: 0, w: 0.5}
     specular: {x: 1, y: 1, z: 1}
     albedo: {x: 0.4, y: 0.4, z: 0}
     emission: {x: 0, y: 0, z: 0}
+    refractionColor: {x: 0, y: 0, z: 0}
     smoothness: 0.95
-    RefractiveIndex: 0
+    RefractiveIndex: 1
+    refractionRoughness: 0.1
+    refractionChance: 0
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
