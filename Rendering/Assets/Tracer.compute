@@ -186,7 +186,7 @@ void IntersectGroundPlane(Ray ray, inout RayHit bestHit)
         bestHit.position = (t * ray.direction) + ray.origin;
         bestHit.normal = float3(0.f, 1.f, 0.f);   //the ground plane has a normal pointing straight up
         bestHit.albedo = 0.5f;
-        bestHit.specular = 0.8f;
+        bestHit.specular = 0.1f;
         bestHit.emission = 0.f;
         bestHit.smoothness = 3.f;
     }
@@ -384,7 +384,7 @@ RayHit Trace(Ray ray)
             bestHit.position = ray.origin + ray.direction * t;
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 0.5f;
-            bestHit.specular = float3(0.01f, 0.01f, 0.01f);
+            bestHit.specular = float3(0.6f, 0.01f, 0.3f);
             bestHit.emission = 0.f;
             bestHit.smoothness = 0.99f;
         }
@@ -400,7 +400,7 @@ RayHit Trace(Ray ray)
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 1.f;
             bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
-            bestHit.emission = 10.f;
+            bestHit.emission = 20.f;
             bestHit.smoothness = 0.01f;
         }
     }
@@ -414,7 +414,7 @@ RayHit Trace(Ray ray)
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 1.f;
             bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
-            bestHit.emission = 10.f;
+            bestHit.emission = 20.f;
             bestHit.smoothness = 0.01f;
         }
     }
@@ -533,7 +533,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     _Pixel.xy = id.xy;
     //Spheres.GetDimensions(SphereCount.x, SphereCount.y); //Metal does not querying buffer sizes
     
-    for (int a =0; a<32; a++)
+    for (int a =0; a<64; a++)
     {
         RayHit rh = Trace(r);
         col += Shade(r, rh) * r.energy; //important that we get ray energy before we call shade
