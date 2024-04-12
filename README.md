@@ -6,3 +6,7 @@
 ![Progress](https://github.com/adellari/Pathtracer/blob/main/Media/Importance%20Sampling%20Emission.png)
 
 ![Progress](https://github.com/adellari/Pathtracer/blob/main/Media/Triangles%20to%20Quads.png)
+
+![Progress](https://github.com/adellari/Pathtracer/blob/main/Media/Glass-Direct.png)
+
+![Progress](https://github.com/adellari/Pathtracer/blob/main/Media/Glass-Indirect.png)
