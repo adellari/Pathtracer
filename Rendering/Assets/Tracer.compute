@@ -400,7 +400,7 @@ RayHit Trace(Ray ray)
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 1.f;
             bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
-            bestHit.emission = 2.f;
+            bestHit.emission = 10.f;
             bestHit.smoothness = 0.01f;
         }
     }
@@ -414,7 +414,7 @@ RayHit Trace(Ray ray)
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 1.f;
             bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
-            bestHit.emission = 2.f;
+            bestHit.emission = 10.f;
             bestHit.smoothness = 0.01f;
         }
     }
@@ -472,12 +472,12 @@ float3 Shade(inout Ray ray, RayHit hit)
         }
         else if (refractChance > 0.f && roulette < specChance + refractChance)
         {
-            //float alpha = SmoothnessToAlpha(2); //higher powers mean our pow function converges around the reflected ray in sample hemisphere
-            //float f = (alpha + 2) / (alpha + 1);
+            float alpha = SmoothnessToAlpha(hit.smoothness); //higher powers mean our pow function converges around the reflected ray in sample hemisphere
+            float f = (alpha + 2) / (alpha + 1);
             //ray.direction = lerp(refracted, normalize(SampleHemisphere(-refracted, alpha)), hit.smoothness * hit.smoothness);
 
             float3 refractionRayDir = refract(ray.direction, hit.normal, hit.inside ? hit.IOR : 1.0f / hit.IOR);
-            refractionRayDir = normalize(lerp(refractionRayDir, normalize(-hit.normal + SampleHemisphere(refractionRayDir, 1000)), 0.f));
+            refractionRayDir = normalize(lerp(refractionRayDir, normalize(-hit.normal + SampleHemisphere(refractionRayDir, alpha)), 0.0f));
             ray.direction = refractionRayDir;
             //ray.energy *= (1.f / refractChance) * hit.refractionColor * sdot(hit.normal, ray.direction, 2.f);
             ray.origin = hit.position - hit.normal * 0.001f;
@@ -533,7 +533,7 @@ void CSMain (uint3 id : SV_DispatchThreadID)
     _Pixel.xy = id.xy;
     //Spheres.GetDimensions(SphereCount.x, SphereCount.y); //Metal does not querying buffer sizes
     
-    for (int a =0; a<8; a++)
+    for (int a =0; a<32; a++)
     {
         RayHit rh = Trace(r);
         col += Shade(r, rh) * r.energy; //important that we get ray energy before we call shade
