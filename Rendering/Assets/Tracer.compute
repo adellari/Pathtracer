@@ -302,6 +302,7 @@ RayHit Trace(Ray ray)
         IntersectSphere(ray, bestHit, Spheres[a]);
     }
 
+    /*
     //back wall
     if(IntersectTriangle(ray, float3(-4.5, 5, -3), float3(3, 0, -3), float3(3, 5, -3), t, u, v))
     {
@@ -331,6 +332,7 @@ RayHit Trace(Ray ray)
         }
     }
 
+    
     
     //left wall
     if(IntersectTriangle(ray, float3(3, 0, -3), float3(3, 0, 3), float3(3, 5, 3), t, u, v))
@@ -389,7 +391,9 @@ RayHit Trace(Ray ray)
             bestHit.smoothness = 0.99f;
         }
     }
+    
 
+    /*
     //top wall
     if(IntersectTriangle(ray, float3(-4.5, 5, -3), float3(3, 5, 3), float3(-4.5, 5, 3), t, u, v))
     {
@@ -400,7 +404,7 @@ RayHit Trace(Ray ray)
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 1.f;
             bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
-            bestHit.emission = 20.f;
+            bestHit.emission = 0.f;
             bestHit.smoothness = 0.01f;
         }
     }
@@ -414,11 +418,11 @@ RayHit Trace(Ray ray)
             bestHit.normal = normalize(cross(v1 - v0, v2 - v0));
             bestHit.albedo = 1.f;
             bestHit.specular = 0.65f * float3(1.f, 1.f, 1.f);
-            bestHit.emission = 20.f;
+            bestHit.emission = 0.f;
             bestHit.smoothness = 0.01f;
         }
     }
-    
+    */
     
  //   IntersectSphere(ray, bestHit, float4(0, 0.5, 2.5, 0.5f));
     return bestHit;
@@ -477,7 +481,7 @@ float3 Shade(inout Ray ray, RayHit hit)
             //ray.direction = lerp(refracted, normalize(SampleHemisphere(-refracted, alpha)), hit.smoothness * hit.smoothness);
 
             float3 refractionRayDir = refract(ray.direction, hit.normal, hit.inside ? hit.IOR : 1.0f / hit.IOR);
-            refractionRayDir = normalize(lerp(refractionRayDir, normalize(-hit.normal + SampleHemisphere(refractionRayDir, alpha)), 0.0f));
+            refractionRayDir = normalize(lerp(refractionRayDir, normalize(-hit.normal + SampleHemisphere(refractionRayDir, alpha)), 0.09f));
             ray.direction = refractionRayDir;
             //ray.energy *= (1.f / refractChance) * hit.refractionColor * sdot(hit.normal, ray.direction, 2.f);
             ray.origin = hit.position - hit.normal * 0.001f;
